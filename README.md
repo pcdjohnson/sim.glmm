@@ -1,7 +1,7 @@
 sim.glmm
 ========
 
-R function to simulate from generalized linear mixed model (GLMM).
+R function to simulate from a generalized linear mixed model (GLMM).
 
 The script can be sourced directly from github using the RCurl package:
 
