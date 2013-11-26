@@ -1,15 +1,5 @@
   # sim.glmm: simulate responses from a GLMM.
-  # Paul Johnson, Institute of BAH&CM, University of Glasgow
-  # 30th September 2013
-  #
-  # v4.2:  
-  #   - changes from v1: now allows random effect variances to be supplied
-  #     as a vector as well as a matrix
-  #   - changes from v2: fixed bug
-  #   - changes from v3: add negative binomial ditribution
-  #   - changes from v4 and 4.1: 
-  #       fixed bug in formation of var-covar matrices of dimension 1
-  #       changed unix/mac end of line so that Windows notepad shows EOL
+  # Paul Johnson, Institute of BAHCM, University of Glasgow
   #
   # DETAILS:
   # the vector of responses is randomly simulated from a GLMM
@@ -87,6 +77,7 @@
           }
 
           rand.names<-colnames(rand.V)
+
           if(any(!sapply(design.data[,rand.names],is.factor))) stop("All random effect variables must be factors")
 
         # simulate the residuals of the random effects
