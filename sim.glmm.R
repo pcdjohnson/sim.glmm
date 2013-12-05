@@ -66,7 +66,7 @@
           if(is.null(rand.V))
           {
             rand.V<-matrix(0,dimnames=rep(list("dummy"),2))
-            design.data$dummy<-1
+            design.data$dummy<-factor(1)
           }
           
         # if rand.V is a vector, convert it to a variance covariance matrix
@@ -310,7 +310,7 @@ if(F)
       boxplot(response~week,data=hut.data,ylab="Response",xlab="Week")
     
       library(lme4)
-      (mod.gaus<-glmer(response~trap+(1|hut)+(1|week),family="gaussian",data=hut.data))
+      (mod.gaus<-lmer(response~trap+(1|hut)+(1|week),data=hut.data))
       fixef(mod.gaus)
     
 
