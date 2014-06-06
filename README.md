@@ -9,4 +9,4 @@ The script can be sourced directly from github using the RCurl package:
     options(RCurlOptions=list(cainfo=system.file("CurlSSL","cacert.pem",package="RCurl")))
     eval(expr=parse(text=getURL("https://raw.githubusercontent.com/pcdjohnson/sim.glmm/master/sim.glmm.R")))
 
-See header of sim.glmm.R for details of how to use the function.
+See header of sim.glmm.R for details of how to use the function. Several examples are given below the function (but not run on sourcing).
