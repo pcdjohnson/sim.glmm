@@ -1,112 +1,160 @@
-  # sim.glmm: simulate responses from a GLMM.
+  # sim.glmm: Simulate responses from a GLMM.
   # Paul Johnson, Institute of BAHCM, University of Glasgow
+  # 6th June 2014
+  #
   #
   # DETAILS:
-  # the vector of responses is randomly simulated from a GLMM
+  #
+  # The vector of responses is randomly simulated from a GLMM
   # and added to an input data set.
-  # the values of the fixed effects, the random effects variances and 
+  # The values of the fixed effects, the random effects variances and 
   # covariances, and the response distribution are inputs. 
   #
+  #
   # ARGUMENTS:
-  # design.data: a data frame containing all the data except the response.
-  # fixed.eff: a list of fixed effects. fixed.eff$intercept has to be supplied.
-  #   the names of the other elements should correspond to variables in design.data.
-  #   for example, to specify a model of the form y ~ 10 + 2*(sex=="Female") + 0.5*age
-  #   you would use fixed.eff=list(intercept=10,sex=c("Male"=0,"Female"=2),age=0.5).
-  #   this should work as long as design.data has a factor called sex with 
-  #   levels "Male" and "Female" and a numeric variable called age.
-  #   if there are no fixed effects (other than the intercept) then fixed.eff should have only
-  #   one element, "intercept".
-  # rand.V: either (a) a vector of the variances of the random effects, where the
-  #   names correspond to factors in design.data; or (b) the variance-covariance 
-  #   matrix of the random effects, where the column and 
-  #   row names correspond to factors in design.data.
-  #   option (b) allows covariances between random effects to be specified.
-  #   if rand.V is null the resulting response will be simulated without 
+  #
+  # mer.fit: A fitted GLMM object of class merMod. This includes models fitted by lmer 
+  #   and glmer in the lme4 package. If mer.fit is supplied, no other argument should 
+  #   be used, as all of the required inputs will be extracted from mer.fit.  
+  #   
+  # design.data: A data frame containing all the data except the response. Its columns 
+  #   should correspond to names(fixed.eff), excluding the intercept, and names(rand.V).
+  #
+  # fixed.eff: A list of fixed effects. One element of the list must be called "intercept"
+  #   or "(Intercept)".   
+  #   The names of the other elements should correspond to variables in design.data.
+  #   For example, to specify a model of the form y ~ 10 + 2*(sex=="Female") + 0.5*age
+  #   you would use fixed.eff = list(intercept=10, sex=c("Male"=0,"Female"=2), age=0.5).
+  #   This should work as long as design.data has a factor called "sex" with 
+  #   levels "Male" and "Female" and a numeric variable called "age".
+  #
+  # rand.V: Either: (a) A vector of the variances of the random effects, where the
+  #   names correspond to grouping factors in design.data; (b) A list of variance-covariance 
+  #   matrices of the random effects, where the names of the list correspond to grouping factors
+  #   in design.data. Currently only simple random effect structures are allowed: either
+  #   random intercepts, or random intercepts-and-slopes. There is no limit on the number of
+  #   random effects, and either crossed or nested structures are allowed.
+  #   Option (b) allows covariances between random effects to be specified, which is necessary
+  #   for random slopes-and-intercepts models because slopes and intercepts are almost 
+  #   always correlated. Where rand.V=NULL the resulting response will be simulated without 
   #   random effects, i.e. from a GLM.
-  # distribution: specifies the response distribution. currently has to be 
-  #   gaussian, poisson, binomial or negative binomial. for all but poisson 
+  #
+  # distribution: The response distribution. Currently has to be one of 
+  #   "gaussian", "poisson", "binomial" and "negbinomial". For all but poisson 
   #   some additional information must be supplied:
   #   gaussian: SD must be suppied.
-  #   binomial: for a binomial response (x successes out of n trials), design.data must have a
-  #     column named n to specify the number of trials. for binary data (0 or 1)
-  #     use design.data$n should be a column of 1s. i haven't dealt with the 
-  #     (realistic) scenario where both x and n vary randomly, although
-  #     i guess the n could be simulated first as poisson then the x as binomial.
-  #     how to analyse this properly is also not clear to me. The approach I would
-  #     take is to simulate variation in n but ignore it in the analysis. This
-  #     seems to work pretty well.
-  #   negative binomial: theta, the overdispersion parameter, must be supplied. 
-  #     theta is equivalent to "size" as defined in ?rnbinom. a poisson distribution
-  #     with mean mu has variance mu. a negative binomial distribution with mean mu 
-  #     and overdispersion parameter theta has variance mu + mu^2/theta.  
-  # SD: the residual standard deviation where the distribution is gaussian.
-  # drop.effects. default is TRUE. if drop.effects is FALSE, the fixed effects and  
-  #    the random effect residuals will be output as additional rows in the data frame.
+  #   binomial: For a binomial response (x successes out of n trials), design.data must have a
+  #     column named "n" to specify the number of trials. For binary data (0 or 1),
+  #     design.data$n should be a column of 1s.
+  #   negative binomial: theta, the dispersion parameter, must be supplied. 
+  #     theta is equivalent to "size" as defined in ?rnbinom. A negative binomial
+  #     distribution with mean mu and dispersion parameter theta has
+  #     variance mu + mu^2/theta.
+  #  
+  # SD: The residual standard deviation where distribution="gaussian".
+  #
+  # theta: The dispersion parameter where distribution="negbinomial".
+  #
+  # drop.effects: Deprecated, and only included for backward compatibility, so should be ignored.
   #
   # VALUE:
-  # the input data frame with the response vector added as a new variable called "response".
+  # The input data frame with the response vector added as a new variable called "response".
   
     sim.glmm<-
-      function(design.data,fixed.eff,rand.V=NULL,
+      function(mer.fit=NULL, design.data=NULL, fixed.eff=NULL, rand.V=NULL,
         distribution=c("gaussian","poisson","binomial","negbinomial"),
-    		SD=NULL,theta=NULL,drop.effects=TRUE)
+        SD=NULL, theta=NULL, drop.effects=NULL)
       {
 
-        # load required package MASS
+        # load required packages lme4 and MASS
 
+          require(lme4)
           require(MASS)
+
+        # if mer.fit is supplied, extract all inputs from it
+
+          if(!is.null(mer.fit))
+          {
+            design.data <- model.frame(mer.fit)
+            fixed.eff <- fixef(mer.fit)
+            rand.V <- VarCorr(mer.fit)
+            distribution <- as.character(family(mer.fit))[1]
+            SD <- attr(rand.V,"sc")
+          }
+
 
         # add column of 1s. this is the "data value" for the intercept
 
-          design.data$intercept<-1
-          
-        # if no random effects are specified, set the variances to zero
+          design.data$"(Intercept)"<-1
 
-          if(is.null(rand.V))
+
+        # add the fixed effects to the data frame, first changing "intercept" to "(Intercept)"
+
+          if(is.null(mer.fit))
           {
-            rand.V<-matrix(0,dimnames=rep(list("dummy"),2))
-            design.data$dummy<-factor(1)
-          }
-          
-        # if rand.V is a vector, convert it to a variance covariance matrix
+            names(fixed.eff)[names(fixed.eff)=="intercept"] <- "(Intercept)"
+            fix.names<-names(fixed.eff)
+            design.data[,paste(fix.names,".fixed",sep="")]<- 
+              sapply(fix.names,
+                function(fe)
+                {
+                  if(is.factor(design.data[,fe])) fixed.eff[[fe]][as.character(design.data[,fe])]
+                    else fixed.eff[[fe]]*design.data[,fe]
+                })
+          } else 
+            {
+              design.data$combinedeffects.fixed <- model.matrix(mer.fit) %*% fixed.eff
+              fix.names <- "combinedeffects"
+            }
+          eff.names <- paste(fix.names,".fixed",sep="")
 
-          if(is.null(dim(rand.V)))
+
+        # if random effects are specified, simulate them 
+
+          if(!is.null(rand.V))
           {
-            rand.V<-structure(diag(rand.V,nrow=length(rand.V)),dimnames=list(names(rand.V),names(rand.V)))
-          }
+          
+            # if rand.V is a vector, convert it to a list
 
-          rand.names<-colnames(rand.V)
+              if(!is.list(rand.V)) rand.V <- as.list(rand.V)
+              rand.names<-names(rand.V)
 
-          if(any(!sapply(design.data[,rand.names],is.factor))) stop("All random effect variables must be factors")
+            # simulate the random effects
 
-        # simulate the residuals of the random effects
+              a.list<-
+                lapply(rand.names,
+                  function(rn)
+                  { 
+                    nt <- nlevels(design.data[,rn])
+                    vcv <- rand.V[[rn]]
+                    if(is.null(dim(vcv))) vcv <- structure(vcv, dim=c(1,1), dimnames=list("(Intercept)","(Intercept)"))
+                    rownames(vcv)[rownames(vcv)=="intercept"] <- "(Intercept)"
+                    colnames(vcv)[colnames(vcv)=="intercept"] <- "(Intercept)"
+                    a <- mvrnorm(nt,rep(0,nrow(vcv)),vcv)
+                    rownames(a) <- levels(design.data[,rn])
+                    ax <- 
+                      if(is.null(mer.fit)) {
+                        a[design.data[,rn],colnames(vcv)] * design.data[,colnames(vcv)] } else {
+                          a[design.data[,rn],colnames(vcv)] * model.matrix(mer.fit)[,colnames(vcv)] }
+                    if(is.null(dim(ax))) dim(ax) <- c(nrow(design.data),nrow(vcv))
+                    apply(ax,1,sum)
+                  })
+              names(a.list) <- rand.names
 
-          nt<-max(c(2,sapply(rand.names,function(r) nlevels(design.data[,r]))))
-          b<-mvrnorm(nt,rep(0,nrow(rand.V)),rand.V)
 
-        # add the random effect residuals to the data frame
+            # add the random effect residuals to the data frame
         
-          design.data[,paste(rand.names,".mean",sep="")]<-
-            sapply(rand.names,function(r) b[as.numeric(design.data[,r]),r])
+              design.data[,paste(rand.names,".random",sep="")]<- do.call("cbind",a.list[rand.names])
+              eff.names <- c(eff.names,paste(rand.names,".random",sep=""))
+          }
 
-        # add the fixed effects to the data frame
-
-          fix.names<-names(fixed.eff)
-          design.data[,paste(fix.names,".eff",sep="")]<- 
-            sapply(fix.names,
-              function(fe)
-              {
-                if(is.factor(design.data[,fe])) fixed.eff[[fe]][as.character(design.data[,fe])]
-                  else fixed.eff[[fe]]*design.data[,fe]
-              })
 
         # sum the fixed effects and random effect residuals to give the linear predictor
         # of the GLMM
         
-          eff.names<-c(paste(fix.names,".eff",sep=""),paste(rand.names,".mean",sep=""))
           design.data$linear.predictor<-apply(design.data[,eff.names],1,sum)
           
+
         # simulate the response values from the linear predictor
   
           if(distribution[1]=="gaussian")
@@ -118,11 +166,12 @@
           if(distribution[1]=="negbinomial")
             design.data$response<-rnbinom(n=1:nrow(design.data),size=theta,mu=exp(design.data$linear.predictor))
   
-        # optionally drop the intercept, fixed effects and random effect residuals from the data frame
 
-          if(drop.effects) design.data<-design.data[,!(names(design.data) %in% c("intercept","linear.predictor",eff.names))]
-          design.data$dummy<-design.data$dummy.mean<-NULL
+        # drop the intercept, fixed effects and random effect residuals from the data frame
+
+          design.data<-design.data[,!(names(design.data) %in% c("(Intercept)","linear.predictor",eff.names))]
   
+
         # return the data frame including the simulated response vector 
 
           return(design.data)
@@ -130,9 +179,9 @@
 
 
 
-  # mor: function to calculate median odds ratio (MOR) from a variance component from a logistic GLMM.
-  # inv.mor: inverse function to get variance from MOR.
-  # for a poisson GLMM these functions will transform variances to median 
+  # mor: Function to calculate median odds ratio (MOR) from a random effect variance in a logistic GLMM.
+  # inv.mor: Inverse function to get variance from MOR.
+  # For a poisson GLMM these functions will transform variances to median 
   # *rate* ratios (MRR), and vice versa.
   # see:
   #   Interpreting Parameters in the Logistic Regression Model with Random Effects
@@ -155,7 +204,7 @@ if(F)
   # simulate counts of tick burden on grouse chicks in a single year from a Poisson-lognormal GLMM,
   # loosely based on: 
   #   Elston et al. (2001). 
-  #   Analysis of aggregation, a worked example: numbers of ticks on red grouse chicks. Parasitology, 122, 563–9.
+  #   Analysis of aggregation, a worked example: numbers of ticks on red grouse chicks. Parasitology, 122, 5639.
   #   http://abdn.ac.uk/lambin-group/Papers/Paper%2041%202001%20Elston%20Tick%20aggregation%20Parasitology.pdf
   # chicks are nested within broods, and broods within locations
 
@@ -185,7 +234,7 @@ if(F)
       library(lme4)
       glmer(response~(1|location)+(1|brood)+(1|chick),family='poisson',data=tickdata)
 
-      
+    
   # lognormal-poisson example: trial of mosquito traps 
   
   # simulate mosquito abundance data from a field trial of 6 types of trap in 6 huts
@@ -232,7 +281,9 @@ if(F)
       boxplot(response~week,data=hut.data,ylab="Abundance",xlab="Week")
     
       library(lme4)
-      (mod.pois<-glmer(response~trap+(1|hut)+(1|week)+(1|row.id),family="poisson",data=hut.data))
+      (mod.pois <-
+        glmer(response~trap+(1|hut)+(1|week)+(1|row.id),family="poisson",
+          data=hut.data,control=glmerControl(optimizer="bobyqa")))
       exp(fixef(mod.pois))
 
     # ... the "trapV" row of the "Pr(>|z|)" column of the fixed effects results table gives a p-value for
@@ -281,7 +332,8 @@ if(F)
       boxplot(response/n~week,data=hut.data,ylab="Mortality",xlab="Week")
     
       library(lme4)
-      (mod.bin<-glmer(cbind(response,n-response)~trap+(1|hut)+(1|week)+(1|row.id),family="binomial",data=hut.data))
+      (mod.bin<-glmer(cbind(response,n-response)~trap+(1|hut)+(1|week)+(1|row.id),
+        family="binomial",data=hut.data,control=glmerControl(optimizer="bobyqa")))
       plogis(fixef(mod.bin)[1])   # estimated mortality in the control trap 
       exp(fixef(mod.bin)[-1])     # odds ratio estimates for the other traps
 
@@ -338,16 +390,120 @@ if(F)
 
     # view and analyse hut data, testing for a difference between trap V and trap U
 
-      par(mfrow=c(2,2))  
-      hist(hut.data$response,xlab="Abundance") # similar amount of overdispersion to the lognormal Poisson example above
-      boxplot(response~trap,data=hut.data,ylab="Abundance",xlab="Trap")
-      boxplot(response~hut,data=hut.data,ylab="Abundance",xlab="Hut")
-      boxplot(response~week,data=hut.data,ylab="Abundance",xlab="Week")
+      # plot data
 
-      library(glmmADMB)  # (note that this analysis failed when running glmmadmb on 32-bit R 2.15.3 for Mac. Worked fine on 64 bit).
-      mod.nbin<-glmmadmb(response~trap+(1|hut)+(1|week),family="nbinom2",data=hut.data)
-      summary(mod.nbin)
-      mod.nbin$alpha # glmmadmb calls the overdispersion parameter "alpha" rather than "theta"
-      exp(fixef(mod.nbin))
+        par(mfrow=c(2,2))  
+        hist(hut.data$response,xlab="Abundance") # similar amount of overdispersion to the lognormal Poisson example above
+        boxplot(response~trap,data=hut.data,ylab="Abundance",xlab="Trap")
+        boxplot(response~hut,data=hut.data,ylab="Abundance",xlab="Hut")
+        boxplot(response~week,data=hut.data,ylab="Abundance",xlab="Week")
+
+      # load glmmADMB package (http://glmmadmb.r-forge.r-project.org/) and prepare data
+
+        library(glmmADMB)  # (note that this analysis failed when running glmmadmb on 32-bit R 2.15.3 for Mac. Worked fine on 64 bit).
+
+      # fit negative binomial mixed model
+
+        mod.nbin<-glmmadmb(response~trap+(1|hut)+(1|week),family="nbinom2",data=hut.data)
+        summary(mod.nbin)
+        mod.nbin$alpha # glmmadmb calls the overdispersion parameter "alpha" rather than "theta"
+        exp(fixef(mod.nbin))
+
+  
+  # simulation from a random slopes model using the sleepstudy data 
+  # from the lme4 package (see ?sleepstudy for details)
+
+    # illustrate variation in slope between subjects
+
+      library(lattice)
+      xyplot(Reaction ~ Days | Subject, sleepstudy,
+        panel=
+          function(x,y){
+            panel.xyplot(x,y)
+            if(length(unique(x))>1) panel.abline(lm(y~x))
+          })  
+
+    # fit random slopes model
+
+      library(lme4)
+      fm1 <- lmer(Reaction ~ Days + (Days | Subject), sleepstudy)
+
+    # use the estimates from the fitted model to parameterise the simulation model
+    # this can be done explicitly, by extracting the estimates and supplying them as arguments
+
+      sim.glmm(design.data=sleepstudy, fixed.eff=fixef(fm1), rand.V=VarCorr(fm1), 
+        distribution="gaussian", SD=attr(VarCorr(fm1),"sc"))
+
+    # but if the model was fitted with lmer or glmer, the function can extract the estimates automatically
+
+      sim.glmm(mer.fit=fm1)
+      
+    # check that the data is being simulated from the correct model by estimating the parameters 
+    # from multiple simulated data sets and plotting the estimates with the input parameters 
+
+      sim.res <- 
+        sapply(1:100,function(i){
+          print(i)
+          sim.fm1  <- lmer(response ~ Days + (Days|Subject), sim.glmm(mer.fit=fm1), control=lmerControl(optimizer="bobyqa"))
+          c(fixef(sim.fm1),unlist(VarCorr(sim.fm1)),SD=attr(VarCorr(sim.fm1),"sc"))
+          })
+
+      boxplot(t(sim.res), main="Boxplot of fixed and random effect\nestimates from 100 simulated data sets")
+      points(c(fixef(fm1),unlist(VarCorr(fm1)),SD=attr(VarCorr(fm1),"sc")), pch="-", col="red", cex=4)
+      legend("topright",legend="True values",pch="-",pt.cex=4, col="red")
+
+
+  # a poisson random slopes example
+  # this example uses the Owls data which is in the glmmADMB package (see ?Owls for details)
+  
+    # load glmmADMB package (http://glmmadmb.r-forge.r-project.org/) and prepare data
+
+      library(glmmADMB)
+      Owls$obs <- factor(1:nrow(Owls))            # to fit observation-level random effect
+      Owls$ArrivalTimeC <- Owls$ArrivalTime - 24   # centre the arrival times at midnight
+
+
+    # illustrate variation in slope between nests
+
+      xyplot(SiblingNegotiation ~ ArrivalTimeC | Nest, Owls,
+        panel=
+          function(x,y){
+            panel.xyplot(x,y)
+            if(length(unique(x))>1) panel.abline(lm(y~x))
+          })  
+
+    # fit random slopes model
+
+      owlmod.rs <- 
+        glmer(SiblingNegotiation ~ ArrivalTimeC + (ArrivalTimeC|Nest) + (1|obs),
+          family="poisson", data=Owls, control=glmerControl(optimizer="bobyqa"))
+
+    # fit simulate from fitted model and fit model on simulated data
+
+      (sim.owlmod.rs <- 
+        glmer(response ~ ArrivalTimeC + (ArrivalTimeC|Nest) + (1|obs),
+          family="poisson", data=sim.glmm(owlmod.rs), control=glmerControl(optimizer="bobyqa")))
+
+
+    # check that the data is being simulated from the correct model by estimating the parameters 
+    # from multiple simulated data sets and plotting the estimates with the input parameters 
+
+      sim.res <- 
+        sapply(1:20,function(i){
+          print(i)
+          sim.owlmod.rs  <- 
+            glmer(response ~ ArrivalTimeC + (ArrivalTimeC|Nest) + (1|obs),
+              family="poisson", data=sim.glmm(owlmod.rs), control=glmerControl(optimizer="bobyqa"))
+          c(fixef(sim.owlmod.rs),unlist(VarCorr(sim.owlmod.rs)))
+          })
+
+      dev.off()
+      boxplot(t(sim.res), main="Boxplot of fixed and random effect\nestimates from 20 simulated data sets")
+      points(c(fixef(owlmod.rs),unlist(VarCorr(owlmod.rs))), pch="-", col="red", cex=4)
+      legend("topright",legend="True values",pch="-",pt.cex=4, col="red")
+
 
 }
+
+
+
