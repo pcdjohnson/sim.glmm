@@ -36,7 +36,9 @@
   #   random effects, and either crossed or nested structures are allowed.
   #   Option (b) allows covariances between random effects to be specified, which is necessary
   #   for random slopes-and-intercepts models because slopes and intercepts are almost 
-  #   always correlated. Where rand.V=NULL the resulting response will be simulated without 
+  #   always correlated. ***Note that the function currently doesn't allow random slopes on 
+  #   variables that are factors. See the examples for a simple workaround.***
+  #   Where rand.V=NULL the resulting response will be simulated without 
   #   random effects, i.e. from a GLM.
   #
   # distribution: The response distribution. Currently has to be one of 
@@ -416,6 +418,7 @@ if(F)
     # illustrate variation in slope between subjects
 
       library(lattice)
+      library(lme4)
       xyplot(Reaction ~ Days | Subject, sleepstudy,
         panel=
           function(x,y){
@@ -425,7 +428,6 @@ if(F)
 
     # fit random slopes model
 
-      library(lme4)
       fm1 <- lmer(Reaction ~ Days + (Days | Subject), sleepstudy)
 
     # use the estimates from the fitted model to parameterise the simulation model
@@ -452,6 +454,38 @@ if(F)
       points(c(fixef(fm1),unlist(VarCorr(fm1)),SD=attr(VarCorr(fm1),"sc")), pch="-", col="red", cex=4)
       legend("topright",legend="True values",pch="-",pt.cex=4, col="red")
 
+
+  # the same example, but with a random slope on a factor fixed effect
+  # currently sim.glmm doesn't handle random slopes for factors, so the 
+  # following is a workaround
+  
+    # convert Days to a binary factor and fit model
+  
+      sleepstudy$fDays <- factor(sleepstudy$Days > 4.5, c(FALSE, TRUE), c("Lo", "Hi"))
+      table(sleepstudy$fDays, sleepstudy$Subject)
+      (fm1f <- lmer(Reaction ~ fDays + (fDays | Subject), sleepstudy))
+
+    # use the estimates from the fitted model to parameterise the simulation model
+      
+      # this can be done directly from the merMod object: 
+
+        sim.glmm(fm1f)
+ 
+      # but if we wanted to change the parameters we would need to be able to specify the parameters individually 
+      # which gives an error
+       
+        sim.glmm(design.data=sleepstudy, 
+          fixed.eff=list(intercept=271.6, fDays=c(Lo=0, Hi=53.76)),
+          rand.V=VarCorr(fm1f), 
+          distribution="gaussian", SD=attr(VarCorr(fm1f),"sc"))
+
+      # a simple workaround is to represent the factor as an indicator variable
+      # (or variables if there are more than two levels):
+      
+        sleepstudy <- cbind(sleepstudy, model.matrix(~ fDays, data=sleepstudy))
+      
+      # the simulation code above should now work. i will apply this fix internally when i have time.
+       
 
   # a poisson random slopes example
   # this example uses the Owls data which is in the glmmADMB package (see ?Owls for details)
