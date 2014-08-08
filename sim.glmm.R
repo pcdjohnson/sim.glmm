@@ -1,6 +1,6 @@
   # sim.glmm: Simulate responses from a GLMM.
   # Paul Johnson, Institute of BAHCM, University of Glasgow
-  # 6th June 2014
+  # 8th August 2014
   #
   #
   # DETAILS:
@@ -81,6 +81,7 @@
             fixed.eff <- fixef(mer.fit)
             rand.V <- VarCorr(mer.fit)
             distribution <- as.character(family(mer.fit))[1]
+            if(distribution == "binomial") design.data$n <- get("n",envir=slot(slot(mer.fit,"resp"),".xData"))
             SD <- attr(rand.V,"sc")
           }
 
@@ -285,7 +286,7 @@ if(F)
       library(lme4)
       (mod.pois <-
         glmer(response~trap+(1|hut)+(1|week)+(1|row.id),family="poisson",
-          data=hut.data,control=glmerControl(optimizer="bobyqa")))
+          data=hut.data))
       exp(fixef(mod.pois))
 
     # ... the "trapV" row of the "Pr(>|z|)" column of the fixed effects results table gives a p-value for
@@ -335,7 +336,7 @@ if(F)
     
       library(lme4)
       (mod.bin<-glmer(cbind(response,n-response)~trap+(1|hut)+(1|week)+(1|row.id),
-        family="binomial",data=hut.data,control=glmerControl(optimizer="bobyqa")))
+        family="binomial",data=hut.data))
       plogis(fixef(mod.bin)[1])   # estimated mortality in the control trap 
       exp(fixef(mod.bin)[-1])     # odds ratio estimates for the other traps
 
@@ -446,7 +447,7 @@ if(F)
       sim.res <- 
         sapply(1:100,function(i){
           print(i)
-          sim.fm1  <- lmer(response ~ Days + (Days|Subject), sim.glmm(mer.fit=fm1), control=lmerControl(optimizer="bobyqa"))
+          sim.fm1  <- lmer(response ~ Days + (Days|Subject), sim.glmm(mer.fit=fm1))
           c(fixef(sim.fm1),unlist(VarCorr(sim.fm1)),SD=attr(VarCorr(sim.fm1),"sc"))
           })
 
@@ -510,13 +511,13 @@ if(F)
 
       owlmod.rs <- 
         glmer(SiblingNegotiation ~ ArrivalTimeC + (ArrivalTimeC|Nest) + (1|obs),
-          family="poisson", data=Owls, control=glmerControl(optimizer="bobyqa"))
+          family="poisson", data=Owls)
 
     # fit simulate from fitted model and fit model on simulated data
 
       (sim.owlmod.rs <- 
         glmer(response ~ ArrivalTimeC + (ArrivalTimeC|Nest) + (1|obs),
-          family="poisson", data=sim.glmm(owlmod.rs), control=glmerControl(optimizer="bobyqa")))
+          family="poisson", data=sim.glmm(owlmod.rs)))
 
 
     # check that the data is being simulated from the correct model by estimating the parameters 
@@ -527,7 +528,7 @@ if(F)
           print(i)
           sim.owlmod.rs  <- 
             glmer(response ~ ArrivalTimeC + (ArrivalTimeC|Nest) + (1|obs),
-              family="poisson", data=sim.glmm(owlmod.rs), control=glmerControl(optimizer="bobyqa"))
+              family="poisson", data=sim.glmm(owlmod.rs))
           c(fixef(sim.owlmod.rs),unlist(VarCorr(sim.owlmod.rs)))
           })
 
