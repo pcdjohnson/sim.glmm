@@ -128,6 +128,7 @@
                 lapply(rand.names,
                   function(rn)
                   { 
+                  	design.data[,rn] <- factor(design.data[,rn])
                     nt <- nlevels(design.data[,rn])
                     vcv <- rand.V[[rn]]
                     if(is.null(dim(vcv))) vcv <- structure(vcv, dim=c(1,1), dimnames=list("(Intercept)","(Intercept)"))
