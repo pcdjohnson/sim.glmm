@@ -1,6 +1,6 @@
   # sim.glmm: Simulate responses from a GLMM.
   # Paul Johnson, Institute of BAHCM, University of Glasgow
-  # 8th August 2014
+  # 5th March 2015
   #
   #
   # DETAILS:
@@ -19,6 +19,9 @@
   #   
   # design.data: A data frame containing all the data except the response. Its columns 
   #   should correspond to names(fixed.eff), excluding the intercept, and names(rand.V).
+  #   Optionally can include a column called "offset" (design.data$offset) to be added to
+  #   the linear predictor. The offset must therefore be on the same scale as the linear 
+  #   predictor (the link scale). See ?offset.
   #
   # fixed.eff: A list of fixed effects. One element of the list must be called "intercept"
   #   or "(Intercept)".   
@@ -158,6 +161,12 @@
         
           design.data$linear.predictor<-apply(design.data[,eff.names],1,sum)
           
+        # if design.data includes an offset, add it to the linear predictor
+    
+          if(!is.null(design.data$offset)) {
+            design.data$linear.predictor <- design.data$linear.predictor + design.data$offset  
+          }
+          
 
         # simulate the response values from the linear predictor
   
@@ -238,6 +247,35 @@ if(F)
       library(lme4)
       glmer(response~(1|location)+(1|brood)+(1|chick),family='poisson',data=tickdata)
 
+  # re-do the simulation with an offset, by including a column called
+  # "offset" in design data.
+  # e.g. let the sampling effort (which could be the area of chick feathers
+  # surveyed for ticks) for the first ten locations be unchanged
+  # i.e. multiplied by 1, while the effort for the locations 11-20
+  # is doubled:
+  
+    tickdata$effort <- (as.numeric(gsub("loc", "", tickdata$location)) > 10.5) + 1
+    table(tickdata$effort)
+  
+  # the offset must be on the link scale, which is log here
+  
+    tickdata$offset <- log(tickdata$effort)
+  
+    tickdata<-
+      sim.glmm(design.data = tickdata, 
+               fixed.eff = list(intercept = log(5)),
+               rand.V = c(location = 2, brood = 1, chick = 0.3),
+               distribution = 'poisson')
+  
+  # plot counts and fit GLMM
+  # repeating plotting several times should show that on average
+  # abundance in locations 11-20 (effort = 2) is twice that in 
+  # locations 1-10
+  
+    boxplot(response ~ effort, data = tickdata)
+    plot(response~jitter(as.numeric(location),factor=0.5),pch=21,bg=as.numeric(brood),data=tickdata)
+    library(lme4)
+    glmer(response~(1|location)+(1|brood)+(1|chick)+offset(log(effort)),family='poisson',data=tickdata)
     
   # lognormal-poisson example: trial of mosquito traps 
   
