@@ -3,6 +3,15 @@ sim.glmm
 
 R function to simulate from a generalized linear mixed model (GLMM).
 
+*****
+**_Since 2016-08-02 sim.glmm has been available in an R package, [GLMMmisc](https://github.com/pcdjohnson/GLMMmisc "GLMMmisc R package"):_**
+
+https://github.com/pcdjohnson/GLMMmisc
+
+**_I'll leave the old version here, so the code below will still work, but I recommend using the up-to-date versions in the GLMMmisc package._**
+*****
+
+
 The script can be sourced directly from github using the RCurl package:
 
     library(RCurl)
